@@ -10,6 +10,13 @@ from torchdrug import core, tasks, metrics
 from torchdrug.layers import functional
 from torchdrug.core import Registry as R
 
+def _size_to_index(size):
+    """Convert size to index"""
+    size = torch.tensor(size, dtype=torch.long)
+    idx = torch.arange(len(size), device=size.device)
+    return idx.repeat_interleave(size)
+
+
 
 Evaluator = core.make_configurable(linkproppred.Evaluator)
 Evaluator = R.register("ogb.linkproppred.Evaluator")(Evaluator)
@@ -307,7 +314,7 @@ class LinkPrediction(tasks.Task, core.Configurable):
         pattern = torch.stack([neg_h_index, any], dim=-1)
         edge_index, num_t_truth = graph.match(pattern)
         t_truth_index = graph.edge_list[edge_index, 1]
-        pos_index = functional._size_to_index(num_t_truth)
+        pos_index = _size_to_index(num_t_truth)
         t_mask = torch.ones(count, self.num_node, dtype=torch.bool, device=self.device)
         t_mask[pos_index, t_truth_index] = 0
         t_mask.scatter_(1, neg_h_index.unsqueeze(-1), 0)
@@ -484,14 +491,14 @@ class InductiveKnowledgeGraphCompletion(tasks.KnowledgeGraphCompletion, core.Con
         pattern = torch.stack([pos_h_index, any, pos_r_index], dim=-1)
         edge_index, num_t_truth = graph.match(pattern)
         t_truth_index = graph.edge_list[edge_index, 1]
-        pos_index = functional._size_to_index(num_t_truth)
+        pos_index = _size_to_index(num_t_truth)
         t_mask = torch.ones(batch_size, graph.num_node, dtype=torch.bool, device=self.device)
         t_mask[pos_index, t_truth_index] = 0
 
         pattern = torch.stack([any, pos_t_index, pos_r_index], dim=-1)
         edge_index, num_h_truth = graph.match(pattern)
         h_truth_index = graph.edge_list[edge_index, 0]
-        pos_index = functional._size_to_index(num_h_truth)
+        pos_index = _size_to_index(num_h_truth)
         h_mask = torch.ones(batch_size, graph.num_node, dtype=torch.bool, device=self.device)
         h_mask[pos_index, h_truth_index] = 0
 
@@ -588,7 +595,7 @@ class KnowledgeGraphCompletionOGB(tasks.KnowledgeGraphCompletion, core.Configura
         pattern = pattern[:batch_size // 2]
         edge_index, num_t_truth = self.fact_graph.match(pattern)
         t_truth_index = self.fact_graph.edge_list[edge_index, 1]
-        pos_index = functional._size_to_index(num_t_truth)
+        pos_index = _size_to_index(num_t_truth)
         if self.heterogeneous_negative:
             pos_t_type = node_type[pos_t_index[:batch_size // 2]]
             t_mask = pos_t_type.unsqueeze(-1) == node_type.unsqueeze(0)
@@ -603,7 +610,7 @@ class KnowledgeGraphCompletionOGB(tasks.KnowledgeGraphCompletion, core.Configura
         pattern = pattern[batch_size // 2:]
         edge_index, num_h_truth = self.fact_graph.match(pattern)
         h_truth_index = self.fact_graph.edge_list[edge_index, 0]
-        pos_index = functional._size_to_index(num_h_truth)
+        pos_index = _size_to_index(num_h_truth)
         if self.heterogeneous_negative:
             pos_h_type = node_type[pos_h_index[batch_size // 2:]]
             h_mask = pos_h_type.unsqueeze(-1) == node_type.unsqueeze(0)
