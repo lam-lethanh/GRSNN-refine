@@ -22,29 +22,38 @@ task:
     temporal_decay_ratio: 0.95
     num_beam: 10
     path_topk: 10
-    symmetric: False
-    self_connection: False
-    boundary_query: True
-    concat_hidden: False
-    layer_norm: False
-    relation_weight: False
-    not_delay: False
-    dependent: True
+    symmetric: false
+    self_connection: false
+    boundary_query: true
+    concat_hidden: false
+    layer_norm: false
+    relation_weight: false
+    not_delay: false
+    dependent: true
     aggregate_func: sum
     linear_scale: 1.0
     m_regularization: 0.0
     surrogate_function: sigmoid
     tau_c: null
   num_negative: 5
-  strict_negative: True
+  strict_negative: true
 
 optimizer:
   class: optim.Adam
   lr: 0.001
   amsgrad: false
   betas: [0.9, 0.999]
-  eps: 0.00000001 
+  eps: 0.00000001
   weight_decay: 0.0
+
+engine:
+  class: Engine
+  gpus: [0]
+  log_interval: 100
+  num_worker: 0
+  batch_size: 128
+  gradient_interval: 1
+  amp_training: false
 
 train:
   num_epoch: 100
