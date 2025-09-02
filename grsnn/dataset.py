@@ -354,72 +354,46 @@ class OGBLBioKG(data.KnowledgeGraphDataset):
         return splits
 
 
-import pandas as pd
-import networkx as nx
-from sklearn.model_selection import train_test_split
-import torch
-import numpy as np
-from torchdrug import data, core
-from torchdrug.data import Graph
-@R.register("datasets.MovieLensLinkPrediction")
-class MovieLensLinkPrediction(data.Graph):
-    def __init__(self, path, split_ratio=(0.85, 0.05, 0.1), filter=True, verbose=1, **kwargs):
+@R.register("datasets.MovieLensDataset")
+class MovieLensDataset(InductiveKnowledgeGraphDataset):
+    """MovieLens dataset for recommendation"""
+    
+    def __init__(self, path, version="100k", verbose=1):
+        path = os.path.expanduser(path)
+        if not os.path.exists(path):
+            os.makedirs(path)
         self.path = path
-        self.split_ratio = split_ratio
-        self.filter = filter
-        self.verbose = verbose
 
-        # Load MovieLens data
-        ratings = pd.read_csv(f"{self.path}/u.data", sep='\t', 
-                              names=['user_id', 'movie_id', 'rating', 'timestamp'])
-        ratings = ratings[ratings['rating'] >= 4]  # Positive edges
+        # Download MovieLens data
+        if version == "100k":
+            url = "https://files.grouplens.org/datasets/movielens/ml-100k.zip"
+        elif version == "1m":
+            url = "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
+            
+        zip_file = utils.download(url, self.path)
+        data_path = utils.extract(zip_file)
+        
+        # Load ratings file
+        ratings_file = os.path.join(data_path, "ratings.dat" if version == "1m" else "u.data")
+        self.load_movielens(ratings_file, verbose=verbose)
 
-        # Create bipartite graph
-        G = nx.Graph()
-        G.add_nodes_from(ratings['user_id'].unique(), bipartite=0)
-        G.add_nodes_from(ratings['movie_id'].unique(), bipartite=1)
-        edge_list = list(zip(ratings['user_id'], ratings['movie_id']))
-
-        # Convert to TorchDrug Graph
-        edge_list = torch.tensor(edge_list, dtype=torch.long)
-        self.graph = Graph(edge_list=edge_list, num_node=len(G.nodes()))
-
-        # Splits
-        length = self.graph.num_edge
-        norm = sum(split_ratio)
-        lengths = [int(r / norm * length) for r in split_ratio]
-        lengths[-1] = length - sum(lengths[:-1])
-
-        g = torch.Generator()
-        g.manual_seed(0)
-        self.train_split, self.valid_split, self.test_split = torch.utils.data.random_split(
-            range(length), lengths, generator=g)
-
-        # Negative edges
-        self.neg_edge_list = []
-        all_nodes = list(range(self.graph.num_node))
-        while len(self.neg_edge_list) < length:
-            u, i = np.random.choice(all_nodes, size=2)
-            if self.graph.has_edge(u, i) or (self.graph.node_attr[u]['bipartite'] == self.graph.node_attr[i]['bipartite']):
-                continue
-            self.neg_edge_list.append([u, i])
-        self.neg_edge_list = torch.tensor(self.neg_edge_list, dtype=torch.long)
-
-        if verbose:
-            print(f"Loaded MovieLens with {self.graph.num_edge} edges, {self.graph.num_node} nodes.")
-
-    def __getitem__(self, index):
-        return self.graph.edge_list[index]
-
-    def __len__(self):
-        return self.graph.num_edge
-
-    def split(self):
-        return [
-            self.__class__(self.path, split_ratio=self.split_ratio, filter=self.filter, 
-                          verbose=0, edge_list=self.graph.edge_list[self.train_split.indices]),
-            self.__class__(self.path, split_ratio=self.split_ratio, filter=self.filter, 
-                          verbose=0, edge_list=self.graph.edge_list[self.valid_split.indices]),
-            self.__class__(self.path, split_ratio=self.split_ratio, filter=self.filter, 
-                          verbose=0, edge_list=self.graph.edge_list[self.test_split.indices])
-        ]
+    def load_movielens(self, ratings_file, verbose=1):
+        # Convert ratings to knowledge graph triplets
+        # user-item-rating becomes (user, item, "rated")
+        triplets = []
+        with open(ratings_file, "r") as f:
+            for line in f:
+                user_id, item_id, rating, _ = line.strip().split("::" if "1m" in ratings_file else "\t")
+                triplets.append((int(user_id), int(item_id), 0)) # 0 represents "rated" relation
+                
+        triplets = torch.tensor(triplets)
+        num_users = triplets[:, 0].max().item() + 1
+        num_items = triplets[:, 1].max().item() + 1
+        
+        # Create vocabularies
+        user_vocab = [f"user_{i}" for i in range(num_users)]
+        item_vocab = [f"item_{i}" for i in range(num_items)]
+        entity_vocab = user_vocab + item_vocab
+        relation_vocab = ["rated"]
+        
+        self.load_triplet(triplets, entity_vocab=entity_vocab, relation_vocab=relation_vocab)
