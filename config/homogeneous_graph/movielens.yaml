@@ -47,12 +47,8 @@ optimizer:
   weight_decay: 0.0
 
 engine:
-  gpus: {{ gpu }}
-  log_interval: 100
-  num_worker: 0
+  gpus: {{ gpus }}
   batch_size: 32
-  gradient_interval: 1
-  amp_training: false
 
 train:
   num_epoch: 20
