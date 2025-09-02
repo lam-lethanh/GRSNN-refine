@@ -32,7 +32,7 @@ task:
     dependent: true
     aggregate_func: sum
     linear_scale: 1.0
-    m_regularization=0.0001
+    m_regularization=0.0
     surrogate_function: sigmoid
     tau_c: null
   num_negative: 1
