@@ -99,12 +99,6 @@ class GRSNN(nn.Module, core.Configurable):
 
 
     def remove_easy_edges(self, graph, h_index, t_index, r_index=None):
-        # Debug: Print inputs
-        print("h_index shape:", h_index.shape)
-        print("t_index shape:", t_index.shape)
-        print("r_index:", r_index)
-        print("Graph edge_list shape:", graph.edge_list.shape)
-        print("Graph num_relation:", graph.num_relation)
         
         # Ensure pattern includes relation ID 0
         batch_size, num_samples = h_index.shape
@@ -152,11 +146,6 @@ class GRSNN(nn.Module, core.Configurable):
 
 
     def negative_sample_to_tail(self, h_index, t_index, r_index=None):
-        # Debug: Print inputs
-        print("negative_sample_to_tail: h_index shape:", h_index.shape)
-        print("negative_sample_to_tail: t_index shape:", t_index.shape)
-        print("negative_sample_to_tail: r_index:", r_index)
-        print("negative_sample_to_tail: num_relation:", self.num_relation)
         
         # If r_index is None, create a tensor of zeros
         if r_index is None:
