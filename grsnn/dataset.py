@@ -368,7 +368,6 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         path = os.path.expanduser(path)
         if not os.path.exists(path):
             os.makedirs(path)
-        # Download and extract dataset
         if version == "100k":
             url = "https://files.grouplens.org/datasets/movielens/ml-100k.zip"
         elif version == "1m":
@@ -387,35 +386,36 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         edges = []
         delimiter = "::" if version == "1m" else "\t"
         
-        # Read ratings using pandas for efficiency
+        # Read ratings using pandas
         ratings_df = pd.read_csv(ratings_file, sep=delimiter, names=['user_id', 'item_id', 'rating', 'timestamp'], engine='python')
-        
-        # Filter ratings >= 3 (optional: to consider only positive interactions)
         ratings_df = ratings_df[ratings_df['rating'] >= 3]
         
-        # Create edges (user_id, item_id) with a single relation type
+        # Adjust item IDs to avoid overlap with user IDs
+        num_users = ratings_df['user_id'].max()
+        ratings_df['item_id'] = ratings_df['item_id'] + num_users - 1  # Shift item IDs
+        
+        # Create edges (user_id, item_id, relation=0)
         for _, row in tqdm(ratings_df.iterrows(), total=len(ratings_df), desc="Loading MovieLens dataset"):
-            user_id, item_id = int(row['user_id']) - 1, int(row['item_id']) - 1
-            edges.append([user_id, item_id, 0])  # Single relation type (0 = "interaction")
+            user_id = int(row['user_id']) - 1
+            item_id = int(row['item_id']) - 1  # Already shifted
+            edges.append([user_id, item_id, 0])
 
-        # Convert to tensor
         edges = torch.tensor(edges, dtype=torch.long)  # Shape: [num_edges, 3]
         
         # Entity vocab: users and items
-        num_users = ratings_df['user_id'].max()
-        num_items = ratings_df['item_id'].max()
+        num_items = ratings_df['item_id'].max() - num_users + 1
         self.entity_vocab = [f"user_{i}" for i in range(num_users)] + [f"item_{i}" for i in range(num_items)]
-        self.relation_vocab = ["interaction"]  # Single relation type for homogeneous graph
+        self.relation_vocab = ["interaction"]
         
-        self._edges = edges[:, :2]  # Store (head, tail) for __getitem__
+        self._edges = edges[:, :2]  # Shape: [num_edges, 2]
         self._edge_index = edges[:, :2].t()  # Shape: [2, num_edges]
-        self._relation_types = edges[:, 2]   # Shape: [num_edges], all zeros
+        self._relation_types = edges[:, 2]  # Shape: [num_edges]
         self._num_node = len(self.entity_vocab)
-        self._num_relation = 1  # Homogeneous graph: only one relation type
+        self._num_relation = 1
         
-        # Create graph with edge_list format [head, tail, relation]
+        # Create graph
         self._graph = data.Graph(
-            edge_list=edges,  # [num_edges, 3]
+            edge_list=edges,
             num_node=self._num_node,
             num_relation=self._num_relation
         )
