@@ -118,9 +118,6 @@ class GRSNN(nn.Module, core.Configurable):
                 torch.zeros(count, dtype=torch.long, device=h_index.device)
             ], dim=-1)  # Shape: [count, 3]
         
-        print("Pattern shape:", pattern.shape)
-        print("Pattern relations:", pattern[:, 2].unique())
-        
         edge_index = graph.match(pattern)[0]
         edge_mask = ~functional.as_mask(edge_index, graph.num_edge)
         return graph.edge_mask(edge_mask)
