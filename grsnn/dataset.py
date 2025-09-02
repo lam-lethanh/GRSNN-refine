@@ -391,8 +391,8 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         with open(ratings_file, "r") as f:
             for line in tqdm(f, "Loading MovieLens dataset"):
                 user_id, item_id, rating, _ = line.strip().split(delimiter)
-                # Store only user_id and item_id for edge data
-                edges.append((int(user_id) - 1, int(item_id) - 1))
+                # Add relation type (0) to edge data
+                edges.append((int(user_id) - 1, int(item_id) - 1, 0))
                 
         edges = torch.tensor(edges)
         num_users = edges[:, 0].max().item() + 1
@@ -403,14 +403,17 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         
         self._num_node = len(self.entity_vocab)
         self._num_relation = len(self.relation_vocab)
-        self._edges = edges  # Store edges without relation type
+        self._edges = edges
+        
+        # Create edge list with source, target, relation format
+        edge_list = edges.view(-1, 3).to(torch.long)
         self._graph = data.Graph(
-            edge_list=edges,
+            edge_list=edge_list,
             num_node=self._num_node,
             num_relation=self._num_relation
         )
         
-        # Convert ranges to lists for indices
+        # Setup train/valid/test split
         num_samples = len(edges)
         num_train = int(num_samples * 0.8)
         num_valid = int(num_samples * 0.1)
@@ -421,9 +424,8 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         self.num_samples = [len(self.train_indices), len(self.valid_indices), len(self.test_indices)]
 
     def __getitem__(self, index):
-        """Return edge data in format expected by LinkPrediction task"""
         edge = self._edges[index]
-        return edge
+        return edge[:2]  # Return only source and target nodes
 
     @property
     def num_node(self):
