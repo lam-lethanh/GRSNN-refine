@@ -373,18 +373,27 @@ class MovieLensDataset(InductiveKnowledgeGraphDataset):
         zip_file = utils.download(url, self.path)
         data_path = utils.extract(zip_file)
         
-        # Load ratings file
-        ratings_file = os.path.join(data_path, "ratings.dat" if version == "1m" else "u.data")
-        self.load_movielens(ratings_file, verbose=verbose)
+        # Fix: Handle correct paths for different versions
+        if version == "100k":
+            ratings_file = os.path.join(data_path, "ml-100k", "u.data")
+        else:  # 1m
+            ratings_file = os.path.join(data_path, "ml-1m", "ratings.dat")
+        
+        if not os.path.exists(ratings_file):
+            raise FileNotFoundError(f"Ratings file not found at {ratings_file}")
+            
+        self.load_movielens(ratings_file, version=version, verbose=verbose)
 
-    def load_movielens(self, ratings_file, verbose=1):
+    def load_movielens(self, ratings_file, version="100k", verbose=1):
         # Convert ratings to knowledge graph triplets
-        # user-item-rating becomes (user, item, "rated")
         triplets = []
+        delimiter = "::" if version == "1m" else "\t"
+        
         with open(ratings_file, "r") as f:
-            for line in f:
-                user_id, item_id, rating, _ = line.strip().split("::" if "1m" in ratings_file else "\t")
-                triplets.append((int(user_id), int(item_id), 0)) # 0 represents "rated" relation
+            for line in tqdm(f, "Loading MovieLens dataset", disable=not verbose):
+                user_id, item_id, rating, _ = line.strip().split(delimiter)
+                # Convert to zero-based indices
+                triplets.append((int(user_id) - 1, int(item_id) - 1, 0))  # 0 represents "rated" relation
                 
         triplets = torch.tensor(triplets)
         num_users = triplets[:, 0].max().item() + 1
