@@ -15,7 +15,7 @@ task:
     hidden_dim: 32
     num_relation: 1
     num_mlp_layer: 2
-    time_steps: 10
+    time_steps: 5
     delay_bound: 4
     Vth: 2.0
     tau: 4.0
@@ -35,8 +35,8 @@ task:
     m_regularization: 0.0
     surrogate_function: sigmoid
     tau_c: null
-  num_negative: 5
-  strict_negative: false
+  num_negative: 1
+  strict_negative: yes
 
 optimizer:
   class: optim.Adam
