@@ -1,20 +1,18 @@
 output_dir: ./experiments/
 
 dataset:
-  class: MovieLensLinkPrediction  # Class mới cần register
-  path: ./datasets/recommendation/movielens/ml-100k  # Path đến MovieLens
-  split_ratio: [0.85, 0.05, 0.1]  # Tương tự CiteSeer (85/5/10)
-  filter: true  # Filtered ranking, như FB15k-237
+  class: MovieLensDataset
+  path: ./datasets/recommendation/
+  version: 100k
 
 task:
   class: LinkPrediction
   model:
     class: GRSNN
-    input_dim: 32  # Như CiteSeer
+    input_dim: 32
     hidden_dim: 32
-    dependent: no  # Homogeneous graph
-    remove_one_hop: yes
-    symmetric: yes  # User-item graph là undirected
+    dependent: yes
+    remove_one_hop: no
     tau: 4.0
     Vth: 2.0
     delay_bound: 4
@@ -22,27 +20,18 @@ task:
     time_steps: 10
     temporal_decay_ratio: 0.95
   criterion: bce
-  num_negative: 50  # Tăng cho recommendation
+  num_negative: 5
   strict_negative: yes
 
 optimizer:
   class: Adam
-  lr: 2.0e-3
+  lr: 0.001
 
 engine:
-  gpus: {{ gpus }}
-  batch_size: 200  # Tăng cho MovieLens
-  num_workers: 4
+  gpus: [0]
+  batch_size: 128
 
 train:
-  num_epoch: 50  # Tăng cho recommendation
-  early_stopping:
-    patience: 5
-    metric: auroc
+  num_epoch: 20
 
-metric:
-  - auroc
-  - ap
-  - precision@10
-  - recall@10
-  - ndcg@10
+metric: mrr
