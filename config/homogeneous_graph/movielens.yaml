@@ -36,7 +36,7 @@ task:
     surrogate_function: sigmoid
     tau_c: null
   num_negative: 5
-  strict_negative: true
+  strict_negative: false
 
 optimizer:
   class: optim.Adam
