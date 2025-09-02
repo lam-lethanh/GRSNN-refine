@@ -359,13 +359,11 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
     """MovieLens dataset for recommendation"""
     
     def __init__(self, path, version="100k", verbose=1):
-        # Initialize properties before parent class
         self._num_node = 0
         self._num_relation = 0
         self._triplets = None
         self._graph = None
         
-        # Now call parent class init
         super(MovieLensDataset, self).__init__()
         
         path = os.path.expanduser(path)
@@ -387,7 +385,6 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         self._load_movielens(ratings_file, version, verbose)
 
     def _load_movielens(self, ratings_file, version, verbose):
-        """Internal method to load MovieLens data"""
         triplets = []
         delimiter = "::" if version == "1m" else "\t"
         
@@ -400,22 +397,23 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         num_users = triplets[:, 0].max().item() + 1
         num_items = triplets[:, 1].max().item() + 1
         
-        # Create vocabularies
         self.entity_vocab = [f"user_{i}" for i in range(num_users)] + [f"item_{i}" for i in range(num_items)]
         self.relation_vocab = ["rated"]
         
-        # Set up graph structure
         self._num_node = len(self.entity_vocab)
         self._num_relation = len(self.relation_vocab)
         self._triplets = triplets
         self._graph = data.Graph(triplets, num_node=self._num_node, num_relation=self._num_relation)
         
-        # Set up train/valid/test split
-        perm = torch.randperm(len(triplets))
-        triplets = triplets[perm]
-        num_train = int(len(triplets) * 0.8)
-        num_valid = int(len(triplets) * 0.1)
-        self.num_samples = [num_train, num_valid, len(triplets) - num_train - num_valid]
+        # Convert ranges to lists for indices
+        num_samples = len(triplets)
+        num_train = int(num_samples * 0.8)
+        num_valid = int(num_samples * 0.1)
+        
+        self.train_indices = list(range(num_train))
+        self.valid_indices = list(range(num_train, num_train + num_valid))
+        self.test_indices = list(range(num_train + num_valid, num_samples))
+        self.num_samples = [len(self.train_indices), len(self.valid_indices), len(self.test_indices)]
 
     @property
     def num_node(self):
@@ -430,10 +428,9 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         return self._graph
 
     def split(self):
-        offset = 0
-        splits = []
-        for num_sample in self.num_samples:
-            split = torch_data.Subset(self, range(offset, offset + num_sample))
-            splits.append(split)
-            offset += num_sample
+        splits = [
+            torch_data.Subset(self, self.train_indices),
+            torch_data.Subset(self, self.valid_indices),
+            torch_data.Subset(self, self.test_indices)
+        ]
         return splits
