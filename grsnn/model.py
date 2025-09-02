@@ -156,9 +156,6 @@ class GRSNN(nn.Module, core.Configurable):
         new_t_index = torch.where(is_t_neg, h_index, t_index)
         new_r_index = torch.where(is_t_neg, r_index, r_index)  # Keep relation ID 0 for single relation
         
-        print("negative_sample_to_tail: new_r_index shape:", new_r_index.shape)
-        print("negative_sample_to_tail: new_r_index values:", new_r_index.unique())
-        
         return new_h_index, new_t_index, new_r_index
     # def negative_sample_to_tail(self, h_index, t_index, r_index):
     #     # convert p(h | t, r) to p(t' | h', r')
