@@ -1,4 +1,3 @@
-```yaml
 output_dir: ./experiments/
 
 dataset:
@@ -47,4 +46,3 @@ metric:
   - precision@10
   - recall@10
   - ndcg@10
-```
