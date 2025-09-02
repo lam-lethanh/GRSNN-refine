@@ -359,7 +359,7 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
     """MovieLens dataset for recommendation"""
     
     def __init__(self, path, version="100k", verbose=1):
-        super(MovieLensDataset, self).__init__()  # Initialize parent class first
+        super(MovieLensDataset, self).__init__()
         
         path = os.path.expanduser(path)
         if not os.path.exists(path):
@@ -413,9 +413,17 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         item_vocab = [f"item_{i}" for i in range(num_items)]
         entity_vocab = user_vocab + item_vocab
         relation_vocab = ["rated"]
+
+        # Set required attributes
+        self.triplets = triplets
+        self.num_node = len(entity_vocab)
+        self.num_relation = len(relation_vocab)
+        self.entity_vocab = entity_vocab
+        self.relation_vocab = relation_vocab
         
-        # Load the triplets using parent class method
-        self.load_triplet(triplets, entity_vocab=entity_vocab, relation_vocab=relation_vocab)
+        # Create graph structure
+        self.graph = data.Graph(triplets, num_node=self.num_node, 
+                              num_relation=self.num_relation)
 
     def split(self):
         offset = 0
