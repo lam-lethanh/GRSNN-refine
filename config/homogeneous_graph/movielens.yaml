@@ -3,7 +3,7 @@ output_dir: /kaggle/working/output/movielens
 dataset:
   class: MovieLensDataset
   path: /kaggle/working/datasets/recommendation
-  version: "100k"  # Use "1m" for MovieLens 1M
+  version: "100k"
 
 task:
   class: tasks.LinkPrediction
@@ -41,10 +41,10 @@ task:
 optimizer:
   class: optim.Adam
   lr: 0.001
-  amsgrad: False
+  amsgrad: false
   betas: [0.9, 0.999]
-  eps: 1e-8  # Changed from '1e-08' to 1e-8 to ensure float
-  weight_decay: 0
+  eps: 0.00000001 
+  weight_decay: 0.0
 
 train:
   num_epoch: 100
@@ -52,7 +52,7 @@ train:
   log_interval: 100
   gradient_interval: 1
   num_worker: 0
-  amp_training: False
+  amp_training: false
 
 gpus: [0]
 logger: logging
