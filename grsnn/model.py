@@ -150,14 +150,35 @@ class GRSNN(nn.Module, core.Configurable):
     #     edge_mask = ~functional.as_mask(edge_index, graph.num_edge)
     #     return graph.edge_mask(edge_mask)
 
-    def negative_sample_to_tail(self, h_index, t_index, r_index):
-        # convert p(h | t, r) to p(t' | h', r')
-        # h' = t, r' = r^{-1}, t' = h
-        is_t_neg = (h_index == h_index[:, [0]]).all(dim=-1, keepdim=True)
-        new_h_index = torch.where(is_t_neg, h_index, t_index)
-        new_t_index = torch.where(is_t_neg, t_index, h_index)
-        new_r_index = torch.where(is_t_neg, r_index, r_index + self.num_relation)
+
+    def negative_sample_to_tail(self, h_index, t_index, r_index=None):
+        # Debug: Print inputs
+        print("negative_sample_to_tail: h_index shape:", h_index.shape)
+        print("negative_sample_to_tail: t_index shape:", t_index.shape)
+        print("negative_sample_to_tail: r_index:", r_index)
+        print("negative_sample_to_tail: num_relation:", self.num_relation)
+        
+        # If r_index is None, create a tensor of zeros
+        if r_index is None:
+            r_index = torch.zeros_like(h_index, dtype=torch.long, device=h_index.device)
+        
+        is_t_neg = (h_index != -1).all(dim=0) & (t_index == -1).all(dim=0)
+        new_h_index = torch.where(is_t_neg, t_index, h_index)
+        new_t_index = torch.where(is_t_neg, h_index, t_index)
+        new_r_index = torch.where(is_t_neg, r_index, r_index)  # Keep relation ID 0 for single relation
+        
+        print("negative_sample_to_tail: new_r_index shape:", new_r_index.shape)
+        print("negative_sample_to_tail: new_r_index values:", new_r_index.unique())
+        
         return new_h_index, new_t_index, new_r_index
+    # def negative_sample_to_tail(self, h_index, t_index, r_index):
+    #     # convert p(h | t, r) to p(t' | h', r')
+    #     # h' = t, r' = r^{-1}, t' = h
+    #     is_t_neg = (h_index == h_index[:, [0]]).all(dim=-1, keepdim=True)
+    #     new_h_index = torch.where(is_t_neg, h_index, t_index)
+    #     new_t_index = torch.where(is_t_neg, t_index, h_index)
+    #     new_r_index = torch.where(is_t_neg, r_index, r_index + self.num_relation)
+    #     return new_h_index, new_t_index, new_r_index
 
     def as_relational_graph(self, graph, self_loop=True):
         # add self loop
