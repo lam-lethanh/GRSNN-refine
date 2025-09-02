@@ -47,7 +47,6 @@ optimizer:
   weight_decay: 0.0
 
 engine:
-  class: Engine
   gpus: [0]
   log_interval: 100
   num_worker: 0
