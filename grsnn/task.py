@@ -304,14 +304,20 @@ class LinkPrediction(tasks.Task, core.Configurable):
     @torch.no_grad()
     def _strict_negative(self, count, split="train"):
         graph = getattr(self, "%s_graph" % split)
-
+    
         node_in = graph.edge_list[:, 0]
         degree_in = torch.bincount(node_in, minlength=self.num_node)
         prob = (graph.num_node - degree_in - 1).float()
-
+    
         neg_h_index = functional.multinomial(prob, count, replacement=True)
         any = -torch.ones_like(neg_h_index)
-        pattern = torch.stack([neg_h_index, any], dim=-1)
+        # Modified: Include relation ID 0
+        pattern = torch.stack([neg_h_index, any, torch.zeros_like(neg_h_index)], dim=-1)  # Shape: [count, 3]
+        print("Pattern shape:", pattern.shape)
+        print("Pattern relations:", pattern[:, 2].unique())
+        print("Graph edge_list shape:", graph.edge_list.shape)
+        print("Graph num_relation:", graph.num_relation)
+        
         edge_index, num_t_truth = graph.match(pattern)
         t_truth_index = graph.edge_list[edge_index, 1]
         pos_index = _size_to_index(num_t_truth)
@@ -321,8 +327,30 @@ class LinkPrediction(tasks.Task, core.Configurable):
         neg_t_candidate = t_mask.nonzero()[:, 1]
         num_t_candidate = t_mask.sum(dim=-1)
         neg_t_index = functional.variadic_sample(neg_t_candidate, num_t_candidate, 1).squeeze(-1)
-
+    
         return neg_h_index, neg_t_index
+    
+    # def _strict_negative(self, count, split="train"):
+    #     graph = getattr(self, "%s_graph" % split)
+
+    #     node_in = graph.edge_list[:, 0]
+    #     degree_in = torch.bincount(node_in, minlength=self.num_node)
+    #     prob = (graph.num_node - degree_in - 1).float()
+
+    #     neg_h_index = functional.multinomial(prob, count, replacement=True)
+    #     any = -torch.ones_like(neg_h_index)
+    #     pattern = torch.stack([neg_h_index, any], dim=-1)
+    #     edge_index, num_t_truth = graph.match(pattern)
+    #     t_truth_index = graph.edge_list[edge_index, 1]
+    #     pos_index = _size_to_index(num_t_truth)
+    #     t_mask = torch.ones(count, self.num_node, dtype=torch.bool, device=self.device)
+    #     t_mask[pos_index, t_truth_index] = 0
+    #     t_mask.scatter_(1, neg_h_index.unsqueeze(-1), 0)
+    #     neg_t_candidate = t_mask.nonzero()[:, 1]
+    #     num_t_candidate = t_mask.sum(dim=-1)
+    #     neg_t_index = functional.variadic_sample(neg_t_candidate, num_t_candidate, 1).squeeze(-1)
+
+    #     return neg_h_index, neg_t_index
 
     def predict_and_target(self, batch, all_loss=None, metric=None):
         batch_size = len(batch)
