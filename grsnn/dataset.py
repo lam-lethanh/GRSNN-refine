@@ -413,6 +413,12 @@ class MovieLensDataset(InductiveKnowledgeGraphDataset):
         relation_vocab = ["rated"]
         
         self.load_triplet(triplets, entity_vocab=entity_vocab, relation_vocab=relation_vocab)
+        
+        # Add required attributes
+        self.num_node = len(entity_vocab)
+        self.num_relation = len(relation_vocab)
+        self.edge_list = triplets
+        self.num_edge = len(triplets)
 
     def split(self):
         offset = 0
