@@ -313,10 +313,6 @@ class LinkPrediction(tasks.Task, core.Configurable):
         any = -torch.ones_like(neg_h_index)
         # Modified: Include relation ID 0
         pattern = torch.stack([neg_h_index, any, torch.zeros_like(neg_h_index)], dim=-1)  # Shape: [count, 3]
-        print("Pattern shape:", pattern.shape)
-        print("Pattern relations:", pattern[:, 2].unique())
-        print("Graph edge_list shape:", graph.edge_list.shape)
-        print("Graph num_relation:", graph.num_relation)
         
         edge_index, num_t_truth = graph.match(pattern)
         t_truth_index = graph.edge_list[edge_index, 1]
