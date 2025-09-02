@@ -20,8 +20,8 @@ task:
     Vth: 2.0
     tau: 4.0
     temporal_decay_ratio: 0.95
-    num_beam: 10
-    path_topk: 10
+    num_beam: 5
+    path_topk: 5
     symmetric: false
     self_connection: false
     boundary_query: true
@@ -32,7 +32,7 @@ task:
     dependent: true
     aggregate_func: sum
     linear_scale: 1.0
-    m_regularization: 0.0
+    m_regularization=0.0001
     surrogate_function: sigmoid
     tau_c: null
   num_negative: 1
