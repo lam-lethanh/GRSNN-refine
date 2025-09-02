@@ -56,7 +56,6 @@ engine:
 
 train:
   num_epoch: 100
-  batch_size: 128
   log_interval: 100
   gradient_interval: 1
   num_worker: 0
