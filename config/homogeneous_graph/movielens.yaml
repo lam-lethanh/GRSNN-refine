@@ -1,7 +1,9 @@
+output_dir: /kaggle/working/output/movielens  # Output directory for Kaggle
+
 dataset:
   class: MovieLensDataset
-  path: ~/datasets/recommendation
-  version: "100k"  # or "1m"
+  path: /kaggle/working/datasets/recommendation
+  version: "100k"  # Use "1m" for MovieLens 1M
 
 task:
   class: tasks.LinkPrediction
@@ -11,7 +13,7 @@ task:
     class: model.GRSNN
     input_dim: 32
     hidden_dim: 32
-    num_relation: 1  # Updated to 1 for homogeneous graph
+    num_relation: 1  # Single relation for homogeneous graph
     num_mlp_layer: 2
     time_steps: 10
     delay_bound: 4
