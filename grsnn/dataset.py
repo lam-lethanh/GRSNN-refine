@@ -393,37 +393,42 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
                 user_id, item_id, rating, _ = line.strip().split(delimiter)
                 # Add relation type (0) to edge data
                 edges.append((int(user_id) - 1, int(item_id) - 1, 0))
+                # Add reverse edge with relation type (1)
+                edges.append((int(item_id) - 1, int(user_id) - 1, 1))
                 
         edges = torch.tensor(edges)
         num_users = edges[:, 0].max().item() + 1
         num_items = edges[:, 1].max().item() + 1
         
         self.entity_vocab = [f"user_{i}" for i in range(num_users)] + [f"item_{i}" for i in range(num_items)]
-        self.relation_vocab = ["rated"]
+        self.relation_vocab = ["rates", "rated_by"]  # Add both directions
         
         self._num_node = len(self.entity_vocab)
         self._num_relation = len(self.relation_vocab)
         self._edges = edges
         
-        # Create edge list with source, target, relation format
+        # Create bidirectional edge list
         edge_list = edges.view(-1, 3).to(torch.long)
         self._graph = data.Graph(
             edge_list=edge_list,
             num_node=self._num_node,
-            num_relation=self._num_relation
+            num_relation=self._num_relation,
+            meta_data={"edge_type": edge_list[:, 2]}  # Store edge types
         )
         
-        # Setup train/valid/test split
-        num_samples = len(edges)
+        # Setup train/valid/test split using only forward edges
+        num_samples = len(edges) // 2  # Divide by 2 because of bidirectional edges
         num_train = int(num_samples * 0.8)
         num_valid = int(num_samples * 0.1)
         
-        self.train_indices = list(range(num_train))
-        self.valid_indices = list(range(num_train, num_train + num_valid))
-        self.test_indices = list(range(num_train + num_valid, num_samples))
+        # Use even indices for forward edges
+        self.train_indices = list(range(0, 2 * num_train, 2))
+        self.valid_indices = list(range(2 * num_train, 2 * (num_train + num_valid), 2))
+        self.test_indices = list(range(2 * (num_train + num_valid), 2 * num_samples, 2))
         self.num_samples = [len(self.train_indices), len(self.valid_indices), len(self.test_indices)]
 
     def __getitem__(self, index):
+        """Return only forward edges for training"""
         edge = self._edges[index]
         return edge[:2]  # Return only source and target nodes
 
