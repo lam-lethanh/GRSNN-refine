@@ -97,24 +97,58 @@ class GRSNN(nn.Module, core.Configurable):
         kernel = torch.logspace(0, (self.time_steps-1)*math.log10(self.temporal_decay_ratio), steps=self.time_steps, device=self.device).unsqueeze(0).unsqueeze(0).unsqueeze(0) / n_scale
         self.final_kernel = nn.Parameter(kernel, requires_grad=False)
 
+
     def remove_easy_edges(self, graph, h_index, t_index, r_index=None):
+        # Debug: Print inputs
+        print("h_index shape:", h_index.shape)
+        print("t_index shape:", t_index.shape)
+        print("r_index:", r_index)
+        print("Graph edge_list shape:", graph.edge_list.shape)
+        print("Graph num_relation:", graph.num_relation)
+        
+        # Ensure pattern includes relation ID 0
+        batch_size, num_samples = h_index.shape
+        count = batch_size * num_samples
         if self.remove_one_hop:
             h_index_ext = torch.cat([h_index, t_index], dim=-1)
             t_index_ext = torch.cat([t_index, h_index], dim=-1)
-            if r_index is not None:
-                any = -torch.ones_like(h_index_ext)
-                pattern = torch.stack([h_index_ext, t_index_ext, any], dim=-1)
-            else:
-                pattern = torch.stack([h_index_ext, t_index_ext], dim=-1)
+            pattern = torch.stack([
+                h_index_ext.flatten(),
+                t_index_ext.flatten(),
+                torch.zeros(count * 2, dtype=torch.long, device=h_index.device)
+            ], dim=-1)  # Shape: [count * 2, 3]
         else:
-            if r_index is not None:
-                pattern = torch.stack([h_index, t_index, r_index], dim=-1)
-            else:
-                pattern = torch.stack([h_index, t_index], dim=-1)
-        pattern = pattern.flatten(0, -2)
+            pattern = torch.stack([
+                h_index.flatten(),
+                t_index.flatten(),
+                torch.zeros(count, dtype=torch.long, device=h_index.device)
+            ], dim=-1)  # Shape: [count, 3]
+        
+        print("Pattern shape:", pattern.shape)
+        print("Pattern relations:", pattern[:, 2].unique())
+        
         edge_index = graph.match(pattern)[0]
         edge_mask = ~functional.as_mask(edge_index, graph.num_edge)
         return graph.edge_mask(edge_mask)
+    
+    # def remove_easy_edges(self, graph, h_index, t_index, r_index=None):
+    #     if self.remove_one_hop:
+    #         h_index_ext = torch.cat([h_index, t_index], dim=-1)
+    #         t_index_ext = torch.cat([t_index, h_index], dim=-1)
+    #         if r_index is not None:
+    #             any = -torch.ones_like(h_index_ext)
+    #             pattern = torch.stack([h_index_ext, t_index_ext, any], dim=-1)
+    #         else:
+    #             pattern = torch.stack([h_index_ext, t_index_ext], dim=-1)
+    #     else:
+    #         if r_index is not None:
+    #             pattern = torch.stack([h_index, t_index, r_index], dim=-1)
+    #         else:
+    #             pattern = torch.stack([h_index, t_index], dim=-1)
+    #     pattern = pattern.flatten(0, -2)
+    #     edge_index = graph.match(pattern)[0]
+    #     edge_mask = ~functional.as_mask(edge_index, graph.num_edge)
+    #     return graph.edge_mask(edge_mask)
 
     def negative_sample_to_tail(self, h_index, t_index, r_index):
         # convert p(h | t, r) to p(t' | h', r')
