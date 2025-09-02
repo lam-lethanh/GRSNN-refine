@@ -356,20 +356,14 @@ class OGBLBioKG(data.KnowledgeGraphDataset):
 
 @R.register("datasets.MovieLensDataset")
 class MovieLensDataset(data.KnowledgeGraphDataset):
-    """MovieLens dataset for recommendation"""
-    
     def __init__(self, path, version="100k", verbose=1):
-        self._num_node = 0
-        self._num_relation = 0
-        self._triplets = None
-        self._graph = None
-        
         super(MovieLensDataset, self).__init__()
         
         path = os.path.expanduser(path)
         if not os.path.exists(path):
             os.makedirs(path)
             
+        # Download and extract dataset
         if version == "100k":
             url = "https://files.grouplens.org/datasets/movielens/ml-100k.zip"
         elif version == "1m":
@@ -377,8 +371,8 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
             
         zip_file = utils.download(url, path)
         data_path = utils.extract(zip_file)
-        
         ratings_file = os.path.join(data_path, f"ml-{version}", "u.data" if version == "100k" else "ratings.dat")
+        
         if not os.path.exists(ratings_file):
             raise FileNotFoundError(f"Ratings file not found at {ratings_file}")
             
@@ -386,51 +380,55 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
 
     def _load_movielens(self, ratings_file, version, verbose):
         edges = []
+        edge_index = []
+        relation_types = []
         delimiter = "::" if version == "1m" else "\t"
         
         with open(ratings_file, "r") as f:
             for line in tqdm(f, "Loading MovieLens dataset"):
                 user_id, item_id, rating, _ = line.strip().split(delimiter)
-                # Add relation type (0) to edge data
-                edges.append((int(user_id) - 1, int(item_id) - 1, 0))
-                # Add reverse edge with relation type (1)
-                edges.append((int(item_id) - 1, int(user_id) - 1, 1))
-                
+                user_id, item_id = int(user_id) - 1, int(item_id) - 1
+                edges.append((user_id, item_id))
+                edge_index.extend([[user_id, item_id], [item_id, user_id]])
+                relation_types.extend([0, 1])  # 0: user->item, 1: item->user
+
         edges = torch.tensor(edges)
+        edge_index = torch.tensor(edge_index).t()
+        relation_types = torch.tensor(relation_types)
+        
         num_users = edges[:, 0].max().item() + 1
         num_items = edges[:, 1].max().item() + 1
         
         self.entity_vocab = [f"user_{i}" for i in range(num_users)] + [f"item_{i}" for i in range(num_items)]
-        self.relation_vocab = ["rates", "rated_by"]  # Add both directions
+        self.relation_vocab = ["rates", "rated_by"]
         
+        self._edges = edges
+        self._edge_index = edge_index
+        self._relation_types = relation_types
         self._num_node = len(self.entity_vocab)
         self._num_relation = len(self.relation_vocab)
-        self._edges = edges
         
-        # Create bidirectional edge list
-        edge_list = edges.view(-1, 3).to(torch.long)
+        # Create graph with edge index format
         self._graph = data.Graph(
-            edge_list=edge_list,
+            edge_list=torch.cat([edge_index, relation_types.unsqueeze(0)], dim=0).t(),
             num_node=self._num_node,
-            num_relation=self._num_relation,
-            meta_data={"edge_type": edge_list[:, 2]}  # Store edge types
+            num_relation=self._num_relation
         )
         
-        # Setup train/valid/test split using only forward edges
-        num_samples = len(edges) // 2  # Divide by 2 because of bidirectional edges
+        # Split indices (using original edges)
+        num_samples = len(edges)
         num_train = int(num_samples * 0.8)
         num_valid = int(num_samples * 0.1)
         
-        # Use even indices for forward edges
-        self.train_indices = list(range(0, 2 * num_train, 2))
-        self.valid_indices = list(range(2 * num_train, 2 * (num_train + num_valid), 2))
-        self.test_indices = list(range(2 * (num_train + num_valid), 2 * num_samples, 2))
+        perm = torch.randperm(num_samples)
+        self.train_indices = perm[:num_train].tolist()
+        self.valid_indices = perm[num_train:num_train + num_valid].tolist()
+        self.test_indices = perm[num_train + num_valid:].tolist()
         self.num_samples = [len(self.train_indices), len(self.valid_indices), len(self.test_indices)]
 
     def __getitem__(self, index):
-        """Return only forward edges for training"""
         edge = self._edges[index]
-        return edge[:2]  # Return only source and target nodes
+        return edge
 
     @property
     def num_node(self):
@@ -445,9 +443,8 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         return self._graph
 
     def split(self):
-        splits = [
+        return [
             torch_data.Subset(self, self.train_indices),
             torch_data.Subset(self, self.valid_indices),
             torch_data.Subset(self, self.test_indices)
         ]
-        return splits
