@@ -64,3 +64,33 @@ if __name__ == "__main__":
 
     train_and_validate(cfg, solver)
     test(cfg, solver)
+
+
+
+import torch
+from sklearn.metrics import roc_auc_score, average_precision_score
+from torchmetrics.functional import retrieval_precision, retrieval_recall, retrieval_normalized_dcg
+
+def evaluate(model, dataset, split, config, device):
+    model.eval()
+    edge_list = dataset[split].edge_list
+    neg_edge_list = dataset.neg_edge_list
+
+    preds, labels = [], []
+    with torch.no_grad():
+        for edge in edge_list.tolist() + neg_edge_list.tolist():
+            u, v = edge
+            pred = model.predict_link(u, v).cpu().item()  # Giả sử model có predict_link
+            labels.append(1 if edge in edge_list.tolist() else 0)
+            preds.append(pred)
+
+    preds = torch.tensor(preds)
+    labels = torch.tensor(labels)
+    results = {
+        'auroc': roc_auc_score(labels, preds),
+        'ap': average_precision_score(labels, preds),
+        'precision@10': retrieval_precision(preds, labels, k=10).item(),
+        'recall@10': retrieval_recall(preds, labels, k=10).item(),
+        'ndcg@10': retrieval_normalized_dcg(preds, labels, k=10).item()
+    }
+    return results
