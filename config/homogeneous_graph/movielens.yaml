@@ -44,7 +44,7 @@ optimizer:
   amsgrad: false
   betas: [0.9, 0.999]
   eps: 0.00000001
-  weight_decay: 0.0
+  weight_decay=0.0001
 
 engine:
   gpus: {{ gpus }}
