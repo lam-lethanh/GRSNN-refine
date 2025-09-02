@@ -1,0 +1,52 @@
+```yaml
+# Dataset configuration
+dataset:
+  name: movielens
+  path: ./data/movielens/ml-100k
+  type: homogeneous  # Bipartite user-item graph treated as homogeneous
+  split_ratio: [0.8, 0.1, 0.1]  # Train/Valid/Test split
+  negative_ratio: 50  # Number of negative samples per positive edge
+  filter: true  # Use filtered ranking (remove known positives)
+
+# Model configuration
+model:
+  name: grsnn
+  num_neurons: 32  # Neurons per node (Appendix E.3)
+  time_steps: 10  # Number of time steps (T=10, optimal from article)
+  delay_bound: 10.0  # Beta for delay scaling (Appendix E.3)
+  tau_m: 10.0  # Membrane time constant
+  v_th: 1.0  # Spike threshold
+  alpha: 0.1  # Current scaling factor
+  decode_lambda: exponential  # Decay for temporal coding (early spikes prioritized)
+  lambda_decay: 0.8  # Exponential decay rate for lambda_tau
+  use_gnn_tricks: false  # GRSNN basic (set true for GRSNN+)
+
+# Training configuration
+training:
+  batch_size: 200  # Suitable for MovieLens scale
+  epochs: 50  # Adjusted for recommendation task
+  learning_rate: 0.001  # From Appendix E.3
+  optimizer: adam
+  loss: bce  # Binary cross-entropy for link prediction
+  negative_sampling: true  # Generate negatives dynamically
+  early_stopping:
+    patience: 5
+    metric: auroc  # Monitor AUROC on valid set
+
+# Evaluation configuration
+evaluation:
+  metrics:
+    - auroc  # Area Under ROC Curve
+    - ap  # Average Precision
+    - precision@10  # Precision at top-10 recommendations
+    - recall@10  # Recall at top-10 recommendations
+    - ndcg@10  # Normalized Discounted Cumulative Gain at 10
+  negative_ratio: 50  # Same as training for consistency
+  filter: true  # Filtered ranking for evaluation
+
+# Hardware configuration
+hardware:
+  gpus: [0]  # Use single GPU
+  num_workers: 4  # DataLoader workers
+  pin_memory: true  # Faster data transfer to GPU
+```
