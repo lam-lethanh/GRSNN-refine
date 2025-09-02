@@ -385,28 +385,33 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         self._load_movielens(ratings_file, version, verbose)
 
     def _load_movielens(self, ratings_file, version, verbose):
-        triplets = []
+        edges = []
         delimiter = "::" if version == "1m" else "\t"
         
         with open(ratings_file, "r") as f:
             for line in tqdm(f, "Loading MovieLens dataset"):
                 user_id, item_id, rating, _ = line.strip().split(delimiter)
-                triplets.append((int(user_id) - 1, int(item_id) - 1, 0))
+                # Store only user_id and item_id for edge data
+                edges.append((int(user_id) - 1, int(item_id) - 1))
                 
-        triplets = torch.tensor(triplets)
-        num_users = triplets[:, 0].max().item() + 1
-        num_items = triplets[:, 1].max().item() + 1
+        edges = torch.tensor(edges)
+        num_users = edges[:, 0].max().item() + 1
+        num_items = edges[:, 1].max().item() + 1
         
         self.entity_vocab = [f"user_{i}" for i in range(num_users)] + [f"item_{i}" for i in range(num_items)]
         self.relation_vocab = ["rated"]
         
         self._num_node = len(self.entity_vocab)
         self._num_relation = len(self.relation_vocab)
-        self._triplets = triplets
-        self._graph = data.Graph(triplets, num_node=self._num_node, num_relation=self._num_relation)
+        self._edges = edges  # Store edges without relation type
+        self._graph = data.Graph(
+            edge_list=edges,
+            num_node=self._num_node,
+            num_relation=self._num_relation
+        )
         
         # Convert ranges to lists for indices
-        num_samples = len(triplets)
+        num_samples = len(edges)
         num_train = int(num_samples * 0.8)
         num_valid = int(num_samples * 0.1)
         
@@ -414,6 +419,11 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
         self.valid_indices = list(range(num_train, num_train + num_valid))
         self.test_indices = list(range(num_train + num_valid, num_samples))
         self.num_samples = [len(self.train_indices), len(self.valid_indices), len(self.test_indices)]
+
+    def __getitem__(self, index):
+        """Return edge data in format expected by LinkPrediction task"""
+        edge = self._edges[index]
+        return edge
 
     @property
     def num_node(self):
