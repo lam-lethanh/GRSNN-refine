@@ -32,7 +32,7 @@ task:
     dependent: true
     aggregate_func: sum
     linear_scale: 1.0
-    m_regularization=0.0
+    m_regularization: 0.000001
     surrogate_function: sigmoid
     tau_c: null
   num_negative: 1
@@ -44,7 +44,7 @@ optimizer:
   amsgrad: false
   betas: [0.9, 0.999]
   eps: 0.00000001
-  weight_decay=0.0001
+  weight_decay: 0.0001
 
 engine:
   gpus: {{ gpus }}
