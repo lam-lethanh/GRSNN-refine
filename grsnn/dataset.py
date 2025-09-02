@@ -373,7 +373,6 @@ class MovieLensDataset(InductiveKnowledgeGraphDataset):
         zip_file = utils.download(url, self.path)
         data_path = utils.extract(zip_file)
         
-        # Fix: Handle correct paths for different versions
         if version == "100k":
             ratings_file = os.path.join(data_path, "ml-100k", "u.data")
         else:  # 1m
@@ -385,17 +384,25 @@ class MovieLensDataset(InductiveKnowledgeGraphDataset):
         self.load_movielens(ratings_file, version=version, verbose=verbose)
 
     def load_movielens(self, ratings_file, version="100k", verbose=1):
-        # Convert ratings to knowledge graph triplets
         triplets = []
         delimiter = "::" if version == "1m" else "\t"
         
         with open(ratings_file, "r") as f:
-            for line in tqdm(f, "Loading MovieLens dataset", disable=not verbose):
+            for line in tqdm(f, "Loading MovieLens dataset"):
                 user_id, item_id, rating, _ = line.strip().split(delimiter)
-                # Convert to zero-based indices
-                triplets.append((int(user_id) - 1, int(item_id) - 1, 0))  # 0 represents "rated" relation
+                triplets.append((int(user_id) - 1, int(item_id) - 1, 0))
                 
         triplets = torch.tensor(triplets)
+        
+        # Shuffle triplets
+        perm = torch.randperm(len(triplets))
+        triplets = triplets[perm]
+        
+        # Split into train/valid/test
+        num_train = int(len(triplets) * 0.8)
+        num_valid = int(len(triplets) * 0.1)
+        self.num_samples = [num_train, num_valid, len(triplets) - num_train - num_valid]
+        
         num_users = triplets[:, 0].max().item() + 1
         num_items = triplets[:, 1].max().item() + 1
         
@@ -406,3 +413,12 @@ class MovieLensDataset(InductiveKnowledgeGraphDataset):
         relation_vocab = ["rated"]
         
         self.load_triplet(triplets, entity_vocab=entity_vocab, relation_vocab=relation_vocab)
+
+    def split(self):
+        offset = 0
+        splits = []
+        for num_sample in self.num_samples:
+            split = torch_data.Subset(self, range(offset, offset + num_sample))
+            splits.append(split)
+            offset += num_sample
+        return splits
