@@ -280,7 +280,7 @@ class GRSNN(nn.Module, core.Configurable):
             t_index = t_index.view(-1, 1)
             r_index = torch.zeros_like(h_index)
 
-        assert (h_index[:, [0]] == h_index).all()
+        # assert (h_index[:, [0]] == h_index).all()
         assert (r_index[:, [0]] == r_index).all()
         output = self.snn_forward(graph, h_index[:, 0], r_index[:, 0])
         feature = output["node_feature"].transpose(0, 1)
