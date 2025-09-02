@@ -47,10 +47,10 @@ optimizer:
   weight_decay: 0.0
 
 engine:
-  gpus: [0]
+  gpus: {{ gpu }}
   log_interval: 100
   num_worker: 0
-  batch_size: 128
+  batch_size: 32
   gradient_interval: 1
   amp_training: false
 
