@@ -359,33 +359,35 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
     """MovieLens dataset for recommendation"""
     
     def __init__(self, path, version="100k", verbose=1):
+        # Initialize properties before parent class
+        self._num_node = 0
+        self._num_relation = 0
+        self._triplets = None
+        self._graph = None
+        
+        # Now call parent class init
         super(MovieLensDataset, self).__init__()
         
         path = os.path.expanduser(path)
         if not os.path.exists(path):
             os.makedirs(path)
-        self.path = path
-
-        # Download MovieLens data
+            
         if version == "100k":
             url = "https://files.grouplens.org/datasets/movielens/ml-100k.zip"
         elif version == "1m":
             url = "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
             
-        zip_file = utils.download(url, self.path)
+        zip_file = utils.download(url, path)
         data_path = utils.extract(zip_file)
         
-        if version == "100k":
-            ratings_file = os.path.join(data_path, "ml-100k", "u.data")
-        else:  # 1m
-            ratings_file = os.path.join(data_path, "ml-1m", "ratings.dat")
-        
+        ratings_file = os.path.join(data_path, f"ml-{version}", "u.data" if version == "100k" else "ratings.dat")
         if not os.path.exists(ratings_file):
             raise FileNotFoundError(f"Ratings file not found at {ratings_file}")
             
-        self.load_movielens(ratings_file, version=version, verbose=verbose)
+        self._load_movielens(ratings_file, version, verbose)
 
-    def load_movielens(self, ratings_file, version="100k", verbose=1):
+    def _load_movielens(self, ratings_file, version, verbose):
+        """Internal method to load MovieLens data"""
         triplets = []
         delimiter = "::" if version == "1m" else "\t"
         
@@ -395,35 +397,37 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
                 triplets.append((int(user_id) - 1, int(item_id) - 1, 0))
                 
         triplets = torch.tensor(triplets)
-        
-        # Shuffle triplets
-        perm = torch.randperm(len(triplets))
-        triplets = triplets[perm]
-        
-        # Split into train/valid/test
-        num_train = int(len(triplets) * 0.8)
-        num_valid = int(len(triplets) * 0.1)
-        self.num_samples = [num_train, num_valid, len(triplets) - num_train - num_valid]
-        
         num_users = triplets[:, 0].max().item() + 1
         num_items = triplets[:, 1].max().item() + 1
         
         # Create vocabularies
-        user_vocab = [f"user_{i}" for i in range(num_users)]
-        item_vocab = [f"item_{i}" for i in range(num_items)]
-        entity_vocab = user_vocab + item_vocab
-        relation_vocab = ["rated"]
-
-        # Set required attributes
-        self.triplets = triplets
-        self.num_node = len(entity_vocab)
-        self.num_relation = len(relation_vocab)
-        self.entity_vocab = entity_vocab
-        self.relation_vocab = relation_vocab
+        self.entity_vocab = [f"user_{i}" for i in range(num_users)] + [f"item_{i}" for i in range(num_items)]
+        self.relation_vocab = ["rated"]
         
-        # Create graph structure
-        self.graph = data.Graph(triplets, num_node=self.num_node, 
-                              num_relation=self.num_relation)
+        # Set up graph structure
+        self._num_node = len(self.entity_vocab)
+        self._num_relation = len(self.relation_vocab)
+        self._triplets = triplets
+        self._graph = data.Graph(triplets, num_node=self._num_node, num_relation=self._num_relation)
+        
+        # Set up train/valid/test split
+        perm = torch.randperm(len(triplets))
+        triplets = triplets[perm]
+        num_train = int(len(triplets) * 0.8)
+        num_valid = int(len(triplets) * 0.1)
+        self.num_samples = [num_train, num_valid, len(triplets) - num_train - num_valid]
+
+    @property
+    def num_node(self):
+        return self._num_node
+
+    @property
+    def num_relation(self):
+        return self._num_relation
+
+    @property
+    def graph(self):
+        return self._graph
 
     def split(self):
         offset = 0
