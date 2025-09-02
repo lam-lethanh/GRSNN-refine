@@ -354,15 +354,20 @@ class OGBLBioKG(data.KnowledgeGraphDataset):
         return splits
 
 
+import os
+import torch
+from torchdrug import data, utils
+from torchdrug.core import Registry as R
+from tqdm import tqdm
+import pandas as pd
+
 @R.register("datasets.MovieLensDataset")
 class MovieLensDataset(data.KnowledgeGraphDataset):
     def __init__(self, path, version="100k", verbose=1):
         super(MovieLensDataset, self).__init__()
-        
         path = os.path.expanduser(path)
         if not os.path.exists(path):
             os.makedirs(path)
-            
         # Download and extract dataset
         if version == "100k":
             url = "https://files.grouplens.org/datasets/movielens/ml-100k.zip"
@@ -380,42 +385,42 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
 
     def _load_movielens(self, ratings_file, version, verbose):
         edges = []
-        edge_index = []
-        relation_types = []
         delimiter = "::" if version == "1m" else "\t"
         
-        with open(ratings_file, "r") as f:
-            for line in tqdm(f, "Loading MovieLens dataset"):
-                user_id, item_id, rating, _ = line.strip().split(delimiter)
-                user_id, item_id = int(user_id) - 1, int(item_id) - 1
-                edges.append((user_id, item_id))
-                edge_index.extend([[user_id, item_id], [item_id, user_id]])
-                relation_types.extend([0, 1])  # 0: user->item, 1: item->user
+        # Read ratings using pandas for efficiency
+        ratings_df = pd.read_csv(ratings_file, sep=delimiter, names=['user_id', 'item_id', 'rating', 'timestamp'], engine='python')
+        
+        # Filter ratings >= 3 (optional: to consider only positive interactions)
+        ratings_df = ratings_df[ratings_df['rating'] >= 3]
+        
+        # Create edges (user_id, item_id) with a single relation type
+        for _, row in tqdm(ratings_df.iterrows(), total=len(ratings_df), desc="Loading MovieLens dataset"):
+            user_id, item_id = int(row['user_id']) - 1, int(row['item_id']) - 1
+            edges.append([user_id, item_id, 0])  # Single relation type (0 = "interaction")
 
-        edges = torch.tensor(edges)
-        edge_index = torch.tensor(edge_index).t()
-        relation_types = torch.tensor(relation_types)
+        # Convert to tensor
+        edges = torch.tensor(edges, dtype=torch.long)  # Shape: [num_edges, 3]
         
-        num_users = edges[:, 0].max().item() + 1
-        num_items = edges[:, 1].max().item() + 1
-        
+        # Entity vocab: users and items
+        num_users = ratings_df['user_id'].max()
+        num_items = ratings_df['item_id'].max()
         self.entity_vocab = [f"user_{i}" for i in range(num_users)] + [f"item_{i}" for i in range(num_items)]
-        self.relation_vocab = ["rates", "rated_by"]
+        self.relation_vocab = ["interaction"]  # Single relation type for homogeneous graph
         
-        self._edges = edges
-        self._edge_index = edge_index
-        self._relation_types = relation_types
+        self._edges = edges[:, :2]  # Store (head, tail) for __getitem__
+        self._edge_index = edges[:, :2].t()  # Shape: [2, num_edges]
+        self._relation_types = edges[:, 2]   # Shape: [num_edges], all zeros
         self._num_node = len(self.entity_vocab)
-        self._num_relation = len(self.relation_vocab)
+        self._num_relation = 1  # Homogeneous graph: only one relation type
         
-        # Create graph with edge index format
+        # Create graph with edge_list format [head, tail, relation]
         self._graph = data.Graph(
-            edge_list=torch.cat([edge_index, relation_types.unsqueeze(0)], dim=0).t(),
+            edge_list=edges,  # [num_edges, 3]
             num_node=self._num_node,
             num_relation=self._num_relation
         )
         
-        # Split indices (using original edges)
+        # Split indices
         num_samples = len(edges)
         num_train = int(num_samples * 0.8)
         num_valid = int(num_samples * 0.1)
@@ -444,7 +449,7 @@ class MovieLensDataset(data.KnowledgeGraphDataset):
 
     def split(self):
         return [
-            torch_data.Subset(self, self.train_indices),
-            torch_data.Subset(self, self.valid_indices),
-            torch_data.Subset(self, self.test_indices)
+            torch.utils.data.Subset(self, self.train_indices),
+            torch.utils.data.Subset(self, self.valid_indices),
+            torch.utils.data.Subset(self, self.test_indices)
         ]
