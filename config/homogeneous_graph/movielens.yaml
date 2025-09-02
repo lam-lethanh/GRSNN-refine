@@ -54,5 +54,4 @@ engine:
 train:
   num_epoch: 20
 
-gpus: [0]
 logger: logging
