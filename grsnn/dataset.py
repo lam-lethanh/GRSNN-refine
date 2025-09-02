@@ -355,10 +355,12 @@ class OGBLBioKG(data.KnowledgeGraphDataset):
 
 
 @R.register("datasets.MovieLensDataset")
-class MovieLensDataset(InductiveKnowledgeGraphDataset):
+class MovieLensDataset(data.KnowledgeGraphDataset):
     """MovieLens dataset for recommendation"""
     
     def __init__(self, path, version="100k", verbose=1):
+        super(MovieLensDataset, self).__init__()  # Initialize parent class first
+        
         path = os.path.expanduser(path)
         if not os.path.exists(path):
             os.makedirs(path)
@@ -412,13 +414,8 @@ class MovieLensDataset(InductiveKnowledgeGraphDataset):
         entity_vocab = user_vocab + item_vocab
         relation_vocab = ["rated"]
         
+        # Load the triplets using parent class method
         self.load_triplet(triplets, entity_vocab=entity_vocab, relation_vocab=relation_vocab)
-        
-        # Add required attributes
-        self.num_node = len(entity_vocab)
-        self.num_relation = len(relation_vocab)
-        self.edge_list = triplets
-        self.num_edge = len(triplets)
 
     def split(self):
         offset = 0
