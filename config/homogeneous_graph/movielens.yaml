@@ -1,52 +1,50 @@
 ```yaml
-# Dataset configuration
+output_dir: ./experiments/
+
 dataset:
-  name: movielens
-  path: ./data/movielens/ml-100k
-  type: homogeneous  # Bipartite user-item graph treated as homogeneous
+  class: MovieLensLinkPrediction  # Custom class for MovieLens
+  path: ./datasets/recommendation/movielens/ml-100k  # Path to MovieLens 100K
   split_ratio: [0.8, 0.1, 0.1]  # Train/Valid/Test split
-  negative_ratio: 50  # Number of negative samples per positive edge
-  filter: true  # Use filtered ranking (remove known positives)
+  filter: true  # Filtered ranking for evaluation
 
-# Model configuration
-model:
-  name: grsnn
-  num_neurons: 32  # Neurons per node (Appendix E.3)
-  time_steps: 10  # Number of time steps (T=10, optimal from article)
-  delay_bound: 10.0  # Beta for delay scaling (Appendix E.3)
-  tau_m: 10.0  # Membrane time constant
-  v_th: 1.0  # Spike threshold
-  alpha: 0.1  # Current scaling factor
-  decode_lambda: exponential  # Decay for temporal coding (early spikes prioritized)
-  lambda_decay: 0.8  # Exponential decay rate for lambda_tau
-  use_gnn_tricks: false  # GRSNN basic (set true for GRSNN+)
+task:
+  class: LinkPrediction
+  model:
+    class: GRSNN
+    input_dim: 32  # Same as CiteSeer for consistency
+    hidden_dim: 32  # Same as CiteSeer
+    dependent: no  # Homogeneous graph, no relation dependency
+    remove_one_hop: yes  # Remove one-hop edges during evaluation
+    symmetric: yes  # User-item graph treated as undirected
+    tau: 4.0  # Membrane time constant, same as CiteSeer
+    Vth: 2.0  # Spike threshold, same as CiteSeer
+    delay_bound: 4  # Delay bound, same as CiteSeer
+    self_connection: False  # No self-loops
+    time_steps: 10  # Optimal from article (Appendix E.3)
+    temporal_decay_ratio: 0.95  # Same as CiteSeer for exponential decay
+  criterion: bce  # Binary cross-entropy for link prediction
+  num_negative: 50  # More negatives for recommendation (vs 1 in CiteSeer)
+  strict_negative: yes  # Ensure negatives are valid
 
-# Training configuration
-training:
-  batch_size: 200  # Suitable for MovieLens scale
-  epochs: 50  # Adjusted for recommendation task
-  learning_rate: 0.001  # From Appendix E.3
-  optimizer: adam
-  loss: bce  # Binary cross-entropy for link prediction
-  negative_sampling: true  # Generate negatives dynamically
+optimizer:
+  class: Adam
+  lr: 2.0e-3  # Same as CiteSeer
+
+engine:
+  gpus: {{ gpus }}  # Placeholder for GPU (e.g., [0])
+  batch_size: 200  # Larger for MovieLens scale (vs 32 in CiteSeer)
+  num_workers: 4  # For DataLoader efficiency
+
+train:
+  num_epoch: 50  # Increased for recommendation task (vs 20 in CiteSeer)
   early_stopping:
     patience: 5
     metric: auroc  # Monitor AUROC on valid set
 
-# Evaluation configuration
-evaluation:
-  metrics:
-    - auroc  # Area Under ROC Curve
-    - ap  # Average Precision
-    - precision@10  # Precision at top-10 recommendations
-    - recall@10  # Recall at top-10 recommendations
-    - ndcg@10  # Normalized Discounted Cumulative Gain at 10
-  negative_ratio: 50  # Same as training for consistency
-  filter: true  # Filtered ranking for evaluation
-
-# Hardware configuration
-hardware:
-  gpus: [0]  # Use single GPU
-  num_workers: 4  # DataLoader workers
-  pin_memory: true  # Faster data transfer to GPU
+metric:
+  - auroc  # Area Under ROC Curve
+  - ap  # Average Precision
+  - precision@10  # Precision at top-10 recommendations
+  - recall@10  # Recall at top-10 recommendations
+  - ndcg@10  # Normalized Discounted Cumulative Gain at 10
 ```
